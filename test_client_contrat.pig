@@ -1,4 +1,4 @@
-nouveau_contrat = LOAD '/hdfs/staging/out/e1225/contrats_entrants' USING PigStorage(';') AS ( mois:chararray, 
+nouveau_contrat = LOAD '/hdfs/staging/out/e1225/model_contrats_entrants' USING PigStorage(';') AS ( mois:chararray, 
 cdSi:chararray,
 noCtrScr:chararray,
 cdFam:chararray,
@@ -11,7 +11,7 @@ noStrGtn:chararray,
 cotMacDo:chararray,
 age_Tranche:chararray);
 
-nouveau_client = LOAD '/hdfs/staging/out/e1225/clients_entrants' USING PigStorage(';') AS ( mois:chararray, 
+nouveau_client = LOAD '/hdfs/staging/out/e1225/model_clients_entrants' USING PigStorage(';') AS ( mois:chararray, 
 cdSi:chararray,
 noCtrScr:chararray,
 noPse:chararray,

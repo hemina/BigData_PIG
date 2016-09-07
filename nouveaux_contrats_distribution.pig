@@ -1,7 +1,7 @@
 -- DESCRIPTION : Fichier pour gérer la projection des contrats sur n mois futurs
 
--- DATE DE CREATION VERSION V1 : 23/03/2015
--- AUTEUR: David COURTE
+-- DATE DE CREATION VERSION V1 : 06/06/2016
+-- AUTEUR: Mina HE
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 --Current
 -- Bibliotheques Java 
@@ -40,7 +40,7 @@ PNB_Contrat = LOAD '/hdfs/data/adhoc/RE/99/0907/ValeurClient/PNB/20150531/09.07.
 	mtMoyen12MoisGlissant:double,
 	noPse:chararray,
 	nbClients:int,
-	noStrGtn:chararray,
+	noStrGtn:long,
 	daNai:chararray,
 	cdSex:chararray,
 	cdInseeCsp:chararray,
@@ -59,6 +59,16 @@ PNB_Contrat = LOAD '/hdfs/data/adhoc/RE/99/0907/ValeurClient/PNB/20150531/09.07.
 	PUAssurance:double,
 	PNB:double
 );
+
+localisation_stru = LOAD '/hdfs/staging/out/e1225/nouveaux_contrats/noGtn_region.csv' USING PigStorage(';') AS
+(
+noDep : int,
+departement : chararray,
+region : chararray,
+numstr : long,
+ville : chararray
+);
+
 
 --On ne garde que le mois de projection 1
 PNB_Contrat = FILTER PNB_Contrat BY moisProjRelatif==1;
@@ -479,50 +489,64 @@ mois201604::cotMacDo AS cotMacDo,
 AgeTranche(mois201604::age,0,90,5) AS age_Tranche;
 
 
-contrat_grp_fam = GROUP contrats_entrants BY cdFam;
-nbContrat_Par_Famille = FOREACH contrat_grp_fam GENERATE group AS cdFam, COUNT_STAR(contrats_entrants) AS nb_contrats;
 
-contrat_grp_Sousfam = GROUP contrats_entrants BY cdSFam;
-nbContrat_Par_SousFamille = FOREACH contrat_grp_Sousfam GENERATE group AS cdSFam, COUNT_STAR(contrats_entrants) AS nb_contrats;
+contrat_grp_fam = GROUP contrats_entrants BY (mois,cdFam);
+nbContrat_Par_Famille = FOREACH contrat_grp_fam GENERATE FLATTEN(group) AS (mois,cdFam), COUNT_STAR(contrats_entrants) AS nb_contrats;
+
+contrat_grp_Sousfam = GROUP contrats_entrants BY (mois,cdSFam);
+nbContrat_Par_SousFamille = FOREACH contrat_grp_Sousfam GENERATE FLATTEN(group) AS (mois,cdSFam), COUNT_STAR(contrats_entrants) AS nb_contrats;
+
 
 clients_entrants = UNION client1,client2,client3,client4,client5,client6,client7,client8,client9,client10,client11;
 
-client_grp_age = GROUP clients_entrants BY age_Tranche;
-nbClient_Par_Age = FOREACH client_grp_age GENERATE group AS age_Tranche, COUNT_STAR(clients_entrants) AS nb_clients;
-
-client_grp_cdInseeCsp = GROUP clients_entrants BY cdInseeCsp;
-nbClient_Par_Metier = FOREACH client_grp_cdInseeCsp GENERATE group AS cdInseeCsp, COUNT_STAR(clients_entrants) AS nb_clients;
-
-client_grp_cdSex = GROUP clients_entrants BY cdSex;
-nbClient_Par_Sex = FOREACH client_grp_cdSex GENERATE group AS cdSex, COUNT_STAR(clients_entrants) AS nb_clients;
-
-client_grp_cdSi = GROUP clients_entrants BY cdSi;
-nbClient_Par_cdSi = FOREACH client_grp_cdSi GENERATE group AS cdSi, COUNT_STAR(clients_entrants) AS nb_clients;
-
-client_grp_noStrGtn = GROUP clients_entrants BY noStrGtn;
-nbClient_Par_noStrGtn = FOREACH client_grp_noStrGtn GENERATE group AS noStrGtn, COUNT_STAR(clients_entrants) AS nb_clients;
-
-client_grp_cotMacDo = GROUP clients_entrants BY cotMacDo;
-nbClient_Par_cotMacDo = FOREACH client_grp_cotMacDo GENERATE group AS cotMacDo, COUNT_STAR(clients_entrants) AS nb_clients;
+clients_entrants_loc = JOIN clients_entrants BY noStrGtn LEFT, localisation_stru BY numstr;
 
 
-nbContrat_Par_Famille = ORDER nbContrat_Par_Famille BY cdFam;
-nbContrat_Par_SousFamille = ORDER nbContrat_Par_SousFamille BY cdSFam;
+client_grp_age = GROUP clients_entrants BY (mois,age_Tranche);
+nbClient_Par_Age = FOREACH client_grp_age GENERATE FLATTEN(group) AS (mois,age_Tranche), COUNT_STAR(clients_entrants) AS nb_clients;
 
-nbClient_Par_Age = ORDER nbClient_Par_Age BY age_Tranche;
-nbClient_Par_Metier = ORDER nbClient_Par_Metier BY cdInseeCsp;
-nbClient_Par_Sex = ORDER nbClient_Par_Sex BY cdSex;
-nbClient_Par_cdSi = ORDER nbClient_Par_cdSi BY cdSi;
-nbClient_Par_noStrGtn = ORDER nbClient_Par_noStrGtn BY noStrGtn;
-nbClient_Par_cotMacDo = ORDER nbClient_Par_cotMacDo BY cotMacDo;
+client_grp_cdInseeCsp = GROUP clients_entrants BY (mois,cdInseeCsp);
+nbClient_Par_Metier = FOREACH client_grp_cdInseeCsp GENERATE FLATTEN(group) AS (mois,cdInseeCsp), COUNT_STAR(clients_entrants) AS nb_clients;
 
-STORE nbContrat_Par_Famille INTO '/hdfs/staging/out/e1225/nbContrat_Par_Famille' using PigStorage(';');
-STORE nbContrat_Par_SousFamille INTO '/hdfs/staging/out/e1225/nbContrat_Par_SousFamille' using PigStorage(';');
+client_grp_cdSex = GROUP clients_entrants BY (mois,cdSex);
+nbClient_Par_Sex = FOREACH client_grp_cdSex GENERATE FLATTEN(group) AS (mois,cdSex), COUNT_STAR(clients_entrants) AS nb_clients;
+
+client_grp_cdSi = GROUP clients_entrants BY (mois,cdSi);
+nbClient_Par_cdSi = FOREACH client_grp_cdSi GENERATE FLATTEN(group) AS (mois,cdSi), COUNT_STAR(clients_entrants) AS nb_clients;
+
+client_grp_departement = GROUP clients_entrants_loc BY (mois,departement);
+nbClient_Par_departement = FOREACH client_grp_departement GENERATE FLATTEN(group) AS (mois,departement), COUNT_STAR(clients_entrants_loc) AS nb_clients;
+
+client_grp_region = GROUP clients_entrants_loc BY (mois,region);
+nbClient_Par_region = FOREACH client_grp_region GENERATE FLATTEN(group) AS (mois,region), COUNT_STAR(clients_entrants_loc) AS nb_clients;
+
+client_grp_cotMacDo = GROUP clients_entrants BY (mois,cotMacDo);
+nbClient_Par_cotMacDo = FOREACH client_grp_cotMacDo GENERATE FLATTEN(group) AS (mois,cotMacDo), COUNT_STAR(clients_entrants) AS nb_clients;
 
 
-STORE nbClient_Par_Age INTO '/hdfs/staging/out/e1225/nbClient_Par_Age' using PigStorage(';');
-STORE nbClient_Par_Metier INTO '/hdfs/staging/out/e1225/nbClient_Par_Metier' using PigStorage(';');
-STORE nbClient_Par_Sex INTO '/hdfs/staging/out/e1225/nbClient_Par_Sex' using PigStorage(';');
-STORE nbClient_Par_cdSi INTO '/hdfs/staging/out/e1225/nbClient_Par_cdSi' using PigStorage(';');
-STORE nbClient_Par_noStrGtn INTO '/hdfs/staging/out/e1225/nbClient_Par_noStrGtn' using PigStorage(';');
-STORE nbClient_Par_cotMacDo INTO '/hdfs/staging/out/e1225/nbClient_Par_cotMacDo' using PigStorage(';');
+nbContrat_Par_Famille = ORDER nbContrat_Par_Famille BY mois,cdFam;
+nbContrat_Par_SousFamille = ORDER nbContrat_Par_SousFamille BY mois,cdSFam;
+
+nbClient_Par_Age = ORDER nbClient_Par_Age BY mois,age_Tranche;
+nbClient_Par_Metier = ORDER nbClient_Par_Metier BY mois,cdInseeCsp;
+nbClient_Par_Sex = ORDER nbClient_Par_Sex BY mois,cdSex;
+nbClient_Par_cdSi = ORDER nbClient_Par_cdSi BY mois,cdSi;
+nbClient_Par_departement = ORDER nbClient_Par_departement BY mois,departement;
+nbClient_Par_region = ORDER nbClient_Par_region BY mois,region;
+nbClient_Par_cotMacDo = ORDER nbClient_Par_cotMacDo BY mois,cotMacDo;
+
+--clients_entrants_loc = ORDER clients_entrants_loc BY mois;
+
+--STORE clients_entrants_loc INTO '/hdfs/staging/out/e1225/nouveaux_contrats/clients_entrants' using PigStorage(';');
+
+STORE nbContrat_Par_Famille INTO '/hdfs/staging/out/e1225/nouveaux_contrats/nbContrat_Par_Famille' using PigStorage(';');
+STORE nbContrat_Par_SousFamille INTO '/hdfs/staging/out/e1225/nouveaux_contrats/nbContrat_Par_SousFamille' using PigStorage(';');
+
+
+STORE nbClient_Par_Age INTO '/hdfs/staging/out/e1225/nouveaux_contrats/nbClient_Par_Age' using PigStorage(';');
+STORE nbClient_Par_Metier INTO '/hdfs/staging/out/e1225/nouveaux_contrats/nbClient_Par_Metier' using PigStorage(';');
+STORE nbClient_Par_Sex INTO '/hdfs/staging/out/e1225/nouveaux_contrats/nbClient_Par_Sex' using PigStorage(';');
+STORE nbClient_Par_cdSi INTO '/hdfs/staging/out/e1225/nouveaux_contrats/nbClient_Par_cdSi' using PigStorage(';');
+STORE nbClient_Par_departement INTO '/hdfs/staging/out/e1225/nouveaux_contrats/nbClient_Par_departement' using PigStorage(';');
+STORE nbClient_Par_region INTO '/hdfs/staging/out/e1225/nouveaux_contrats/nbClient_Par_region' using PigStorage(';');
+STORE nbClient_Par_cotMacDo INTO '/hdfs/staging/out/e1225/nouveaux_contrats/nbClient_Par_cotMacDo' using PigStorage(';');
